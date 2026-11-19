@@ -14,6 +14,15 @@ import { apkName, apkPath, ANDROID_APP_ID } from '../src/release.mjs';
 const tmp = await mkdtemp(join(tmpdir(), 'voice-os-pwa-test-'));
 let browser;
 let server;
+
+async function disconnectSite() {
+  if (!server?.listening) return;
+  await new Promise((resolve) => {
+    server.close(resolve);
+    server.closeAllConnections();
+  });
+}
+
 try {
   const web = join(tmp, 'site');
   const releases = join(tmp, 'releases');
@@ -22,8 +31,10 @@ try {
   const signer = 'ab'.repeat(32); // Test fixture, not a certificate for distribution.
   server = createWebServer({ directory: web, android: { directory: releases, signer } }).listen(0, '127.0.0.1');
   await once(server, 'listening');
-  const base = `http://127.0.0.1:${server.address().port}/`;
+  const port = server.address().port;
+  const base = `http://127.0.0.1:${port}/`;
   browser = await chromium.launch({ executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH, headless: true });
+  console.log(`Checking the production PWA in Chromium ${browser.version()}`);
   const context = await browser.newContext({ viewport: { width: 375, height: 812 }, isMobile: true, hasTouch: true });
   const page = await context.newPage();
   page.setDefaultTimeout(10_000);
@@ -91,7 +102,8 @@ try {
 
   const originalBundle = await readFile(join(web, 'index.html'), 'utf8');
   const originalWorker = await readFile(join(web, 'sw.js'), 'utf8');
-  await context.setOffline(true);
+  // Cut off the real origin: Chromium may fetch service worker updates outside DevTools page-level offline emulation.
+  await disconnectSite();
   await page.reload();
   await page.getByRole('button', { name: 'Install app', exact: true }).click();
   await dialog.getByText(/Couldn’t read the published release/).waitFor();
@@ -105,7 +117,8 @@ try {
   await page.getByRole('button', { name: 'Open website', exact: true }).waitFor();
   console.log('Offline shell and typed plan still work. API metadata and APK links are not cached.');
 
-  await context.setOffline(false);
+  server.listen(port, '127.0.0.1');
+  await once(server, 'listening');
   const oldAsset = /src="(\/assets\/index-[^"]+\.js)"/.exec(originalBundle)[1];
   const newAsset = oldAsset.replace('.js', '-integration-test.js');
   // A new release changes both the main HTML and a hashed asset path.
@@ -126,14 +139,20 @@ try {
   await page.waitForFunction(() => document.documentElement.dataset.testShell === 'next');
   await page.getByRole('button', { name: 'Install app', exact: true }).waitFor();
   assert.equal(await page.getByRole('button', { name: 'Open website', exact: true }).count(), 0);
-  await context.setOffline(true);
+  await disconnectSite();
   await page.reload();
   assert.equal(await page.evaluate(() => document.documentElement.dataset.testShell), 'next');
   await page.getByRole('button', { name: 'Install app', exact: true }).waitFor();
   assert.deepEqual(errors, []);
   console.log('A second production shell waited without clearing the live session, applied on click, and reopened offline. No page errors.');
+} catch (error) {
+  if (process.env.GITHUB_ACTIONS === 'true') {
+    const details = String(error.stack ?? error).slice(0, 4500).replaceAll('%', '%25').replaceAll('\r', '%0D').replaceAll('\n', '%0A');
+    console.error(`::error title=PWA browser check failed::${details}`);
+  }
+  throw error;
 } finally {
   await browser?.close();
-  if (server) await new Promise((resolve) => server.close(resolve));
+  await disconnectSite();
   await rm(tmp, { recursive: true, force: true });
 }
