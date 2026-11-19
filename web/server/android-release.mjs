@@ -73,20 +73,22 @@ export function createAndroidReleaseApi({ directory = '', signer = '' } = {}) {
       if (!release) { json(req, res, metadata ? 200 : 404, metadata ? { schema: 1, release: null } : { error: 'not_found' }); return; }
       if (download && path !== release.downloadPath) { json(req, res, 404, { error: 'not_found' }); return; }
       file = await open(resolve(folder, apkName(release.versionCode)), 'r');
-      const info = await file.stat();
-      if (!info.isFile() || info.size !== release.sizeBytes) throw Error('invalid_apk');
-      const key = `${info.dev}/${info.ino}/${info.mtimeMs}/${info.ctimeMs}/${info.size}/${release.sha256}`;
+      const info = await file.stat({ bigint: true });
+      const size = Number(info.size);
+      if (!info.isFile() || info.size !== BigInt(release.sizeBytes)) throw Error('invalid_apk');
+      // Nanosecond timestamps avoid reusing a verified hash after a same-size rewrite within one millisecond.
+      const key = `${info.dev}/${info.ino}/${info.mtimeNs}/${info.ctimeNs}/${info.size}/${release.sha256}`;
       await verify(file, key, release);
       if (metadata) { json(req, res, 200, { schema: 1, release }); return; }
 
-      const partial = byteRange(req.headers.range, info.size);
-      if (partial === false) { res.writeHead(416, { ...headers, 'Content-Range': `bytes */${info.size}` }).end(); return; }
+      const partial = byteRange(req.headers.range, size);
+      if (partial === false) { res.writeHead(416, { ...headers, 'Content-Range': `bytes */${size}` }).end(); return; }
       const start = partial?.start ?? 0;
-      const end = partial?.end ?? info.size - 1;
+      const end = partial?.end ?? size - 1;
       res.writeHead(partial ? 206 : 200, {
         ...headers, 'Content-Type': 'application/vnd.android.package-archive', 'Content-Length': end - start + 1,
         'Content-Disposition': `attachment; filename="${apkName(release.versionCode)}"`, 'Accept-Ranges': 'bytes',
-        ...(partial ? { 'Content-Range': `bytes ${start}-${end}/${info.size}` } : {}),
+        ...(partial ? { 'Content-Range': `bytes ${start}-${end}/${size}` } : {}),
       });
       if (req.method === 'HEAD') { res.end(); return; }
       await pipeline(file.createReadStream({ autoClose: false, start, end }), res);

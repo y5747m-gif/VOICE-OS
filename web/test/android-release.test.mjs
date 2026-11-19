@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { once } from 'node:events';
-import { copyFile, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { copyFile, mkdtemp, rm, utimes, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createWebServer } from '../server/app.mjs';
@@ -95,6 +95,9 @@ test('revalidates modified files and rejects missing or corrupted artifacts', (t
   const file = await stage(directory);
   assert.equal((await request(RELEASE_PATH)).status, 200);
   await writeFile(file, Buffer.alloc(bytes.length, 17));
+  // Force a distinct timestamp even on filesystems with coarse timestamp resolution.
+  const changed = new Date(Date.now() + 2000);
+  await utimes(file, changed, changed);
   assert.equal((await request(RELEASE_PATH)).status, 503);
   assert.equal((await request(apkPath(8))).status, 503);
   await rm(file);

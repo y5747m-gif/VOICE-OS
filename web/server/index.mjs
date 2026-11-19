@@ -7,6 +7,10 @@ try {
   await Promise.all(['index.html', 'sw.js'].map((name) => stat(new URL(`../dist/${name}`, import.meta.url))));
 } catch { console.error('Run npm run build before npm start.'); process.exit(1); }
 const port = Number(process.env.PORT || 4173);
-createWebServer({ directory, voice: { apiKey: process.env.ELEVENLABS_API_KEY }, android: {
+createWebServer({ directory, voice: { apiKey: process.env.ELEVENLABS_API_KEY }, groq: {
+  apiKey: process.env.GROQ_API_KEY,
+  transcriptionModel: process.env.GROQ_TRANSCRIPTION_MODEL,
+  commandModel: process.env.GROQ_COMMAND_MODEL,
+}, android: {
   directory: process.env.ANDROID_RELEASE_DIR, signer: process.env.ANDROID_SIGNER_SHA256,
 } }).listen(port, '0.0.0.0', () => console.log(`VOICE OS Web listening on port ${port}`));

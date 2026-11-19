@@ -1,4 +1,4 @@
-import { StrictMode, useEffect, useId, useRef, useState } from 'react';
+import { StrictMode, useCallback, useEffect, useId, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
   ArrowRight, ArrowUp, ArrowUpRight, AudioLines, Check, ChevronRight, CircleAlert,
@@ -13,7 +13,7 @@ import '@fontsource/ibm-plex-sans-arabic/500.css';
 import '@fontsource/ibm-plex-sans-arabic/600.css';
 import { ACTIONS, COMMAND_LIMIT, VOICE, actionById, interpretCommand, localeTag, voiceLine } from './domain.mjs';
 import { copy } from './copy.mjs';
-import { useSpeechInput, useVoicePlayer } from './voice.js';
+import { useGroqSpeechInput, useSpeechInput, useVoicePlayer } from './voice.js';
 import { MobilePanel, mobileCopy, useInstallation } from './mobile.jsx';
 import wave from './assets/silk-wave.jpg';
 import './style.css';
@@ -109,9 +109,9 @@ function Heading({ t, page, mobile, installLabel, openInstall }) {
   );
 }
 
-function VoiceConsole({ t, state, mic, micPress, stop, draft, onDraft, send, inputRef, result, language, launch, player, mode, speak, resultRef }) {
+function VoiceConsole({ t, state, mic, micPress, stop, draft, onDraft, send, inputRef, result, language, launch, player, mode, speak, resultRef, canUseGroq, askGroq }) {
   const listening = mic.phase === 'listening';
-  const thinking = mic.phase === 'transcribing';
+  const thinking = mic.phase === 'transcribing' || state === 'transcribing';
   const captured = state !== 'ready' && !listening && !thinking;
   const stageCopy = {
     ready: t.stageTitle, listening: t.stageListening, transcribing: t.stageWait, prepared: t.stagePrepared,
@@ -157,16 +157,19 @@ function VoiceConsole({ t, state, mic, micPress, stop, draft, onDraft, send, inp
         </form>
         {overLimit && <p className="form-error" role="status">{voiceLine({ locale: language, code: 'tooLong' })}</p>}
       </div>
-      {result && <ResultCard result={result} t={t} language={language} launch={launch} stop={stop} player={player} mode={mode} speak={speak} cardRef={resultRef} />}
+      {result && <ResultCard result={result} t={t} language={language} launch={launch} stop={stop} player={player} mode={mode} speak={speak} cardRef={resultRef} canUseGroq={canUseGroq} askGroq={askGroq} />}
     </section>
   );
 }
 
-function ResultCard({ result, t, language, launch, stop, mode, player, speak, cardRef }) {
+function ResultCard({ result, t, language, launch, stop, mode, player, speak, cardRef, canUseGroq, askGroq }) {
   const action = actionById(result.actionId);
   const preview = result.code === 'prepared' && action;
   const line = result.code === 'micError' ? (t.micError[result.issue] ?? t.micError.unknown)
-    : result.code === 'stopped' ? t.stopMessage : voiceLine({ locale: language, code: result.code, ...(result.code === 'opened' ? { actionId: result.actionId } : {}) });
+    : result.code === 'aiError' ? (t.groqError[result.issue] ?? t.groqError.provider_error)
+      : result.code === 'aiThinking' ? t.groqThinking
+        : result.code === 'stopped' ? t.stopMessage
+          : voiceLine({ locale: language, code: result.code, ...(result.code === 'opened' ? { actionId: result.actionId } : {}) });
   const canPlay = mode !== 'muted' && ['opened', 'popup', 'unsupported', 'compound', 'tooLong', 'empty'].includes(result.code);
   return (
     <div className="result-wrap" ref={cardRef} tabIndex={-1} role="region" aria-label={t.result}>
@@ -187,6 +190,7 @@ function ResultCard({ result, t, language, launch, stop, mode, player, speak, ca
               onClick={() => player.busy ? player.stop() : speak(result)}>{player.busy ? <Square size={17} aria-hidden="true" /> : <Volume2 size={20} aria-hidden="true" />}</button>}
           </div>
         )}
+        {result.code === 'unsupported' && canUseGroq && <div className="ai-understand"><button className="subtle-button" type="button" onClick={() => askGroq(result.transcript)}><Sparkles size={16} aria-hidden="true" />{t.askGroq}</button></div>}
         {!preview && <AudioState player={player} t={t} />}
       </div>
     </div>
@@ -337,15 +341,37 @@ function App() {
   const [mode, setMode] = useState(() => readPref('mode', ['browser', 'eleven', 'muted'], 'browser'));
   const [auto, setAuto] = useState(() => readPref('auto', ['on', 'off'], 'off') === 'on');
   const [configuration, setConfiguration] = useState('checking');
+  const [groqConfiguration, setGroqConfiguration] = useState('checking');
   const [draft, setDraft] = useState('');
   const [dialog, setDialog] = useState(null);
+  const [pendingGroq, setPendingGroq] = useState(null);
   const [result, setResult] = useState(null);
   const [entries, setEntries] = useState([]);
+  const [activeProvider, setActiveProvider] = useState(null);
   const inputRef = useRef(null);
   const resultRef = useRef(null);
   const micApproved = useRef(false);
+  const groqMicApproved = useRef(false);
   const sequence = useRef(0);
-  const mic = useSpeechInput();
+  const aiRequest = useRef(null);
+  const browserMic = useSpeechInput();
+  const groqMic = useGroqSpeechInput();
+  const useGroqMic = groqConfiguration === 'configured' && groqMic.supported;
+  const canUseGroq = groqConfiguration === 'configured';
+  const mic = activeProvider === 'groq' ? groqMic : activeProvider === 'browser' ? browserMic : useGroqMic ? groqMic : browserMic;
+  const cancelVoiceInput = useCallback(() => {
+    const browser = browserMic.cancel();
+    const groq = groqMic.cancel();
+    setActiveProvider(null);
+    return browser || groq;
+  }, [browserMic.cancel, groqMic.cancel]);
+  const cancelAiRequest = useCallback(() => {
+    if (!aiRequest.current) return false;
+    aiRequest.current.abort();
+    aiRequest.current = null;
+    sequence.current++;
+    return true;
+  }, []);
   const player = useVoicePlayer();
 
   useEffect(() => {
@@ -365,13 +391,27 @@ function App() {
   }, []);
 
   useEffect(() => {
+    const controller = new AbortController();
+    let live = true;
+    const deadline = setTimeout(() => controller.abort(), 5000);
+    fetch('/api/groq/status', { signal: controller.signal, cache: 'no-store' })
+      .then((res) => res.ok ? res.json() : Promise.reject())
+      .then((data) => { if (live) setGroqConfiguration(data.configured === true ? 'configured' : 'missing'); })
+      .catch(() => { if (live) setGroqConfiguration('missing'); })
+      .finally(() => clearTimeout(deadline));
+    return () => { live = false; clearTimeout(deadline); controller.abort(); };
+  }, []);
+
+  useEffect(() => {
     const onHash = () => {
-      if (mic.cancel()) setResult({ code: 'stopped', id: ++sequence.current });
+      const cancelled = cancelVoiceInput();
+      const cancelledAi = cancelAiRequest();
+      if (cancelled || cancelledAi) setResult({ code: 'stopped', id: ++sequence.current });
       setPage(getPage());
     };
     addEventListener('hashchange', onHash);
     return () => removeEventListener('hashchange', onHash);
-  }, [mic.cancel]);
+  }, [cancelVoiceInput, cancelAiRequest]);
   useEffect(() => { window.scrollTo(0, 0); }, [page]);
   useEffect(() => {
     if (!result || page !== 'home') return;
@@ -384,12 +424,15 @@ function App() {
 
   function navigate(target) {
     if (page === target) return;
-    if (mic.cancel()) setResult({ code: 'stopped', id: ++sequence.current });
+    const inputCancelled = cancelVoiceInput();
+    const aiCancelled = cancelAiRequest();
+    if (inputCancelled || aiCancelled) setResult({ code: 'stopped', id: ++sequence.current });
     setPage(target);
     if (window.location.hash !== `#${target}`) window.location.hash = target;
   }
   function stop() {
-    mic.cancel();
+    cancelVoiceInput();
+    cancelAiRequest();
     player.stop();
     setResult({ code: 'stopped', id: ++sequence.current });
   }
@@ -398,6 +441,7 @@ function App() {
     return player.play(payload, mode);
   }
   function process(text) {
+    if (aiRequest.current) return;
     player.stop();
     const reply = { ...interpretCommand(text), transcript: text.slice(0, COMMAND_LIMIT), id: ++sequence.current };
     setResult(reply);
@@ -405,14 +449,15 @@ function App() {
   }
   function send(event) {
     event.preventDefault();
-    if (!draft.trim() || mic.phase !== 'idle' || draft.length > COMMAND_LIMIT) return;
+    if (!draft.trim() || mic.phase !== 'idle' || aiRequest.current || draft.length > COMMAND_LIMIT) return;
     process(draft);
     setDraft('');
     inputRef.current?.blur();
   }
   function launch(action, transcript) {
     // The popup is opened synchronously from a user's click. Recognizer callbacks only prepare a plan.
-    mic.cancel();
+    cancelVoiceInput();
+    cancelAiRequest();
     player.stop();
     let code = 'popup';
     let tab;
@@ -433,15 +478,65 @@ function App() {
   function startMic() {
     setResult(null);
     player.stop();
-    mic.start(language, process,
-      (issue) => setResult({ code: 'micError', issue, id: ++sequence.current }),
-      () => setResult({ code: 'stopped', id: ++sequence.current }));
+    const provider = useGroqMic ? groqMic : browserMic;
+    setActiveProvider(useGroqMic ? 'groq' : 'browser');
+    provider.start(language, (text) => {
+      setActiveProvider(null);
+      process(text);
+    }, (issue) => {
+      setActiveProvider(null);
+      setResult({ code: 'micError', issue, id: ++sequence.current });
+    }, () => {
+      setActiveProvider(null);
+      setResult({ code: 'stopped', id: ++sequence.current });
+    });
   }
   function micPress() {
     if (mic.phase === 'listening') { mic.finish(); return; }
-    if (mic.phase !== 'idle') return;
-    if (!mic.supported || micApproved.current) startMic();
+    if (mic.phase !== 'idle' || aiRequest.current) return;
+    const approved = useGroqMic ? groqMicApproved.current : micApproved.current;
+    if (!mic.supported || approved) startMic();
     else setDialog('mic');
+  }
+  function askGroq(command) {
+    if (!canUseGroq || typeof command !== 'string' || !command.trim() || command.length > COMMAND_LIMIT) return;
+    setPendingGroq(command);
+    setDialog('groq-consent');
+  }
+  async function sendToGroq() {
+    const command = pendingGroq;
+    setPendingGroq(null);
+    setDialog(null);
+    if (!canUseGroq || typeof command !== 'string' || !command.trim()) return;
+    cancelVoiceInput();
+    cancelAiRequest();
+    player.stop();
+    const controller = new AbortController();
+    const requestId = ++sequence.current;
+    aiRequest.current = controller;
+    setResult({ code: 'aiThinking', transcript: command, id: requestId });
+    try {
+      const response = await fetch('/api/groq/interpret', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ locale: language, command }), signal: controller.signal,
+      });
+      const data = await response.json().catch(() => ({}));
+      if (aiRequest.current !== controller || sequence.current !== requestId) return;
+      if (!response.ok) {
+        setResult({ code: 'aiError', issue: data.error ?? 'provider_error', transcript: command, id: requestId });
+        return;
+      }
+      const action = actionById(data.actionId);
+      setResult(action
+        ? { code: 'prepared', actionId: action.id, transcript: command, id: requestId }
+        : { code: 'unsupported', transcript: command, id: requestId });
+    } catch (error) {
+      if (error?.name !== 'AbortError' && aiRequest.current === controller) {
+        setResult({ code: 'aiError', issue: 'provider_error', transcript: command, id: requestId });
+      }
+    } finally {
+      if (aiRequest.current === controller) aiRequest.current = null;
+    }
   }
   function chooseMode(value) {
     if (value === 'eleven' && configuration !== 'configured') return;
@@ -449,9 +544,17 @@ function App() {
     persistMode(value);
   }
   function persistMode(value) { player.stop(); setMode(value); writePref('mode', value); }
-  function settings() { if (mic.cancel()) stop(); setDialog('settings'); }
+  function settings() {
+    const inputCancelled = cancelVoiceInput();
+    const aiCancelled = cancelAiRequest();
+    if (inputCancelled || aiCancelled) setResult({ code: 'stopped', id: ++sequence.current });
+    setDialog('settings');
+  }
   function changeLanguage() {
-    if (mic.cancel()) setResult({ code: 'stopped', id: ++sequence.current });
+    const inputCancelled = cancelVoiceInput();
+    const aiCancelled = cancelAiRequest();
+    if (inputCancelled || aiCancelled) setResult({ code: 'stopped', id: ++sequence.current });
+    if (dialog === 'groq-consent') { setDialog(null); setPendingGroq(null); }
     player.stop();
     setLanguage(language === 'ar' ? 'en' : 'ar');
   }
@@ -459,8 +562,8 @@ function App() {
   useEffect(() => {
     function keyboard(event) {
       if (dialog || page !== 'home') return;
-      if (event.key === 'Escape' && player.busy && mic.phase === 'idle' && result?.code !== 'prepared') player.stop();
-      else if (event.key === 'Escape' && (mic.phase !== 'idle' || result?.code === 'prepared')) stop();
+      if (event.key === 'Escape' && player.busy && mic.phase === 'idle' && result?.code !== 'prepared' && !aiRequest.current) player.stop();
+      else if (event.key === 'Escape' && (mic.phase !== 'idle' || result?.code === 'prepared' || aiRequest.current)) stop();
       else if (event.key === '/' && !event.ctrlKey && !event.metaKey && !event.altKey && !event.target?.matches?.('input,textarea,[contenteditable]')) {
         event.preventDefault();
         inputRef.current?.focus();
@@ -470,7 +573,7 @@ function App() {
     return () => window.removeEventListener('keydown', keyboard);
   });
 
-  const state = mic.phase !== 'idle' ? mic.phase : !result ? 'ready'
+  const state = mic.phase !== 'idle' ? mic.phase : result?.code === 'aiThinking' ? 'transcribing' : !result ? 'ready'
     : ['prepared', 'opened', 'stopped'].includes(result.code) ? result.code : 'error';
 
   return (
@@ -479,11 +582,12 @@ function App() {
       <div className="shell">
         <Topbar t={t} language={language} page={page} navigate={navigate} toggleLanguage={changeLanguage} settings={settings} />
         <main>
-          <Heading t={t} page={page} mobile={device} installLabel={installLabel} openInstall={() => { if (mic.cancel()) stop(); setDialog('install'); }} />
+          <Heading t={t} page={page} mobile={device} installLabel={installLabel} openInstall={() => { cancelVoiceInput(); cancelAiRequest(); player.stop(); setDialog('install'); }} />
           {page === 'home' && <>
             <div className="workspace">
               <VoiceConsole t={t} state={state} mic={mic} micPress={micPress} stop={stop} draft={draft} onDraft={setDraft} send={send}
-                inputRef={inputRef} result={result} language={language} launch={launch} player={player} mode={mode} speak={speak} resultRef={resultRef} />
+                inputRef={inputRef} result={result} language={language} launch={launch} player={player} mode={mode} speak={speak} resultRef={resultRef}
+                canUseGroq={canUseGroq} askGroq={askGroq} />
               <aside className="side-column"><QuickPanel t={t} language={language} launch={launch} navigate={navigate} />
                 <VoiceProfile t={t} language={language} configuration={configuration} settings={settings} /></aside>
             </div>
@@ -495,14 +599,18 @@ function App() {
         <footer><span><ShieldCheck size={15} strokeWidth={1.8} aria-hidden="true" />{t.privacy}</span><span lang="en" dir="ltr">VOICE OS <i /> WEB EDITION</span></footer>
       </div>
       {dialog === 'install' && <Modal title={installLabel.title} icon={Smartphone} onClose={() => setDialog(null)} t={t}>
-        <MobilePanel language={language} device={device} beforeRefresh={() => { mic.cancel(); player.stop(); }} />
+        <MobilePanel language={language} device={device} beforeRefresh={() => { cancelVoiceInput(); cancelAiRequest(); player.stop(); }} />
       </Modal>}
       {dialog === 'settings' && <VoiceSettings t={t} configuration={configuration} mode={mode} choose={chooseMode} auto={auto}
         onAuto={(value) => { setAuto(value); writePref('auto', value ? 'on' : 'off'); }}
         player={player} sample={() => speak({ code: 'sample' })} onClose={() => setDialog(null)} />}
       {dialog === 'mic' && <Modal title={t.micTitle} icon={Mic} onClose={() => setDialog(null)} t={t}>
-        <p className="modal-detail">{t.micDetail}</p><div className="modal-actions"><button className="primary-button" type="button" onClick={() => { micApproved.current = true; setDialog(null); startMic(); }}>{t.micStart}</button>
+        <p className="modal-detail">{useGroqMic ? t.groqMicDetail : t.micDetail}</p><div className="modal-actions"><button className="primary-button" type="button" onClick={() => { if (useGroqMic) groqMicApproved.current = true; else micApproved.current = true; setDialog(null); startMic(); }}>{t.micStart}</button>
           <button className="text-button" type="button" onClick={() => setDialog(null)}>{t.dismiss}</button></div>
+      </Modal>}
+      {dialog === 'groq-consent' && <Modal title={t.groqConsentTitle} icon={ShieldCheck} onClose={() => { setDialog(null); setPendingGroq(null); }} t={t}>
+        <p className="modal-detail">{t.groqConsentDetail}</p><div className="modal-actions"><button className="primary-button" type="button" onClick={sendToGroq}>{t.groqSend}</button>
+          <button className="text-button" type="button" onClick={() => { setDialog(null); setPendingGroq(null); }}>{t.dismiss}</button></div>
       </Modal>}
       {dialog === 'consent' && <Modal title={t.voiceEnable} icon={ShieldCheck} onClose={() => setDialog('settings')} t={t}>
         <p className="modal-detail">{t.voiceConsent}</p><div className="modal-actions"><button className="primary-button" type="button" onClick={() => { persistMode('eleven'); setDialog('settings'); }}>{t.enable}</button>
