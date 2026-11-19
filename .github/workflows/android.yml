@@ -45,6 +45,25 @@ jobs:
           failure="${failure//$'\n'/'%0A'}"
           printf '::error title=Android build or lint failed::%s\n' "$failure"
           exit 1
+      - name: Annotate Android lint errors
+        if: failure()
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          from xml.etree import ElementTree
+
+          report = Path("app/build/reports/lint-results-debug.xml")
+          if report.is_file():
+              for issue in ElementTree.parse(report).iter("issue"):
+                  if issue.get("severity") not in ("Error", "Fatal"):
+                      continue
+                  location = issue.find("location")
+                  file = location.get("file", "") if location is not None else ""
+                  line = location.get("line", "") if location is not None else ""
+                  detail = f"{file}:{line}: [{issue.get('id')}] {issue.get('message')}"
+                  detail = detail.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+                  print(f"::error title=Android lint::{detail}")
+          PY
       - name: Check merged debug APK permission surface
         run: |
           set -euo pipefail
