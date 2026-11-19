@@ -1,0 +1,18 @@
+{
+  "id": "/",
+  "name": "VOICE OS",
+  "short_name": "VOICE OS",
+  "description": "واجهة VOICE OS الصوتية للويب",
+  "lang": "ar-EG",
+  "dir": "rtl",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f6ecf8",
+  "theme_color": "#f6ecf8",
+  "icons": [
+    { "src": "/icons/voice-os-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/voice-os-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/voice-os-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

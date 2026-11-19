@@ -1,0 +1,267 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- Identity & navigation -->
+    <string name="app_name" translatable="false">VOICE OS</string>
+    <string name="orb_label" translatable="false">01 / VOICE CORE</string>
+    <string name="tagline" translatable="false">Your Phone. Your Voice. Your Intelligence.</string>
+    <string name="brand_caption">Voice interface</string>
+    <string name="nav_home">Home</string>
+    <string name="nav_assistant">Assistant</string>
+    <string name="nav_actions">Actions</string>
+    <string name="nav_more">More</string>
+    <string name="nav_memory">Memory</string>
+    <string name="nav_history">History</string>
+    <string name="nav_automations">Shortcuts</string>
+    <string name="nav_settings">Settings</string>
+    <string name="nav_permissions">Permissions</string>
+    <string name="nav_about">About</string>
+    <string name="back">Back</string>
+    <string name="edit">Edit</string>
+    <string name="view_all">View all</string>
+    <string name="cancel">Cancel</string>
+    <string name="confirm_delete">Delete</string>
+
+    <!-- Home & press-to-talk -->
+    <string name="home_kicker">YOUR VOICE WORKSPACE</string>
+    <string name="greeting_day">Good morning</string>
+    <string name="greeting_afternoon">Good afternoon</string>
+    <string name="greeting_evening">Good evening</string>
+    <string name="greeting_named">%1$s, %2$s</string>
+    <string name="home_intro">Open apps and reach Android settings with your voice.</string>
+    <string name="home_device_provider">Press to talk · On-device recognition mode</string>
+    <string name="home_system_provider">Press to talk · Android speech provider</string>
+    <string name="mic_press">Press to talk</string>
+    <string name="mic_finish">Finish speaking</string>
+    <string name="mic_connecting">Connecting to the speech service…</string>
+    <string name="mic_speaking">Speech detected. Tap Finish speaking to end the capture.</string>
+    <string name="mic_listening_hint">Speak now. Stop cancels without acting.</string>
+    <string name="stop">Stop listening, execution or audio</string>
+    <string name="phase_ready">Ready</string>
+    <string name="phase_listening">Listening</string>
+    <string name="phase_thinking">Thinking</string>
+    <string name="phase_executing">Executing</string>
+    <string name="phase_completed">Completed</string>
+    <string name="phase_error">Error</string>
+    <string name="phase_stopped">Stopped</string>
+    <string name="home_shortcuts">Quick shortcuts</string>
+    <string name="home_activity">Recent activity</string>
+    <string name="no_pins">No pinned shortcuts</string>
+    <string name="no_pins_detail">Use Edit to pin an action to Home.</string>
+
+    <!-- Assistant & results -->
+    <string name="assistant_kicker">COMMAND SESSION</string>
+    <string name="assistant_title">Talk to your phone</string>
+    <string name="assistant_intro">Voice and text run through the same Android action engine.</string>
+    <string name="assistant_try">Try a command</string>
+    <string name="assistant_try_detail">Pick a phrase to fill the input. Nothing runs until you submit it.</string>
+    <string name="assistant_earlier">Earlier in this session</string>
+    <string name="command_input">Write a command</string>
+    <string name="command_send">Run command</string>
+    <string name="transcript_final">Your command</string>
+    <string name="transcript_partial">What we’re hearing</string>
+    <string name="single_step">01 / DEVICE ACTION</string>
+    <string name="reply_label">VOICE OS RESPONSE</string>
+    <string name="checking_command">Matching your request to a supported action.</string>
+    <string name="checking_platform">Requesting the action from Android.</string>
+    <string name="replay">Read reply aloud</string>
+    <string name="reply_empty">No command was detected. Try again or type it.</string>
+    <string name="reply_long">That command is too long. Use at most 240 characters.</string>
+    <string name="reply_multiple">This version runs one action at a time. No action was taken. Try a single command.</string>
+    <string name="reply_unknown">I didn’t find a supported action in that request. Nothing was run. Try an example from Actions.</string>
+    <string name="reply_dispatched">I sent Android the request to open %1$s.</string>
+    <string name="reply_battery">Battery level is %1$s.</string>
+    <string name="reply_no_handler">Android couldn’t find an available app to open %1$s.</string>
+    <string name="reply_blocked">Android blocked the request for %1$s.</string>
+    <string name="reply_not_foreground">Keep VOICE OS open on screen to run the command.</string>
+    <string name="reply_no_battery">Android didn’t return a battery percentage on this device.</string>
+    <string name="reply_platform_error">Android couldn’t complete the request for %1$s.</string>
+    <string name="reply_stopped">The current operation was cancelled before handoff.</string>
+    <string name="unmatched_command">Unmatched command</string>
+
+    <!-- Recognition & TTS feedback -->
+    <string name="voice_permission">Microphone permission is off. Enable it in Permissions or use text.</string>
+    <string name="voice_no_device">On-device recognition isn’t available here. Use text or choose the Android speech provider in Settings.</string>
+    <string name="voice_no_provider">Android has no available speech recognition service. You can still type commands.</string>
+    <string name="voice_no_speech">No clear speech was detected. Try again somewhere quieter or type your command.</string>
+    <string name="voice_timeout">Listening timed out. Press the mic to try again.</string>
+    <string name="voice_language">This recognizer can’t use the selected language right now. Check the device language packs or type your command.</string>
+    <string name="voice_busy">The Android speech service is busy. Wait a moment and try again.</string>
+    <string name="voice_audio">Android couldn’t capture microphone audio. Check that the mic isn’t blocked, or use text.</string>
+    <string name="voice_provider_error">The Android speech service returned an error. Try again or type the command.</string>
+    <string name="type_instead">Type instead</string>
+    <string name="voice_settings_link">Voice settings</string>
+    <string name="tts_loading">Checking installed text-to-speech voices…</string>
+    <string name="tts_exact">An offline voice is available for this locale.</string>
+    <string name="tts_alternate">An offline voice in the same language is available, but its accent can be different.</string>
+    <string name="tts_missing">No installed offline voice for this language. Responses stay visible as text.</string>
+    <string name="tts_error">Android text-to-speech isn’t working right now. Responses stay visible as text.</string>
+
+    <!-- Catalog -->
+    <string name="actions_kicker">DEVICE TOOLS</string>
+    <string name="actions_title">Action catalog</string>
+    <string name="actions_intro">Tap to run or say the example. Apps and panels depend on what’s available on your device.</string>
+    <string name="group_apps">Open apps</string>
+    <string name="group_apps_detail">Launch only. VOICE OS doesn’t send messages, place calls or control app content.</string>
+    <string name="group_panels">Android settings</string>
+    <string name="group_panels_detail">Opens each settings screen without changing any values.</string>
+    <string name="group_device">Device information</string>
+    <string name="group_device_detail">Read-only values provided by Android.</string>
+    <string name="action_whatsapp">WhatsApp</string>
+    <string name="phrase_whatsapp">Open WhatsApp</string>
+    <string name="action_youtube">YouTube</string>
+    <string name="phrase_youtube">Open YouTube</string>
+    <string name="action_instagram">Instagram</string>
+    <string name="phrase_instagram">Open Instagram</string>
+    <string name="action_facebook">Facebook</string>
+    <string name="phrase_facebook">Open Facebook</string>
+    <string name="action_spotify">Spotify</string>
+    <string name="phrase_spotify">Open Spotify</string>
+    <string name="action_camera">Camera</string>
+    <string name="phrase_camera">Open the camera</string>
+    <string name="action_dialer">Dialer</string>
+    <string name="phrase_dialer">Open the phone app</string>
+    <string name="action_maps">Google Maps</string>
+    <string name="phrase_maps">Open Google Maps</string>
+    <string name="action_settings">Android settings</string>
+    <string name="phrase_settings">Open Android settings</string>
+    <string name="action_wifi">Wi-Fi settings</string>
+    <string name="phrase_wifi">Open Wi-Fi settings</string>
+    <string name="action_bluetooth">Bluetooth settings</string>
+    <string name="phrase_bluetooth">Open Bluetooth settings</string>
+    <string name="action_location">Location settings</string>
+    <string name="phrase_location">Open location settings</string>
+    <string name="action_display">Display settings</string>
+    <string name="phrase_display">Open display settings</string>
+    <string name="action_battery">Battery level</string>
+    <string name="phrase_battery">Check battery level</string>
+
+    <!-- More & memory -->
+    <string name="more_kicker">CONTROL CENTER</string>
+    <string name="more_title">Make it yours</string>
+    <string name="more_intro">Manage what stays on your phone and how VOICE OS works.</string>
+    <string name="more_memory">View, edit or delete your display name.</string>
+    <string name="more_history">See real outcomes and clear activity.</string>
+    <string name="more_automations">Choose the actions pinned to Home.</string>
+    <string name="more_settings">Language, voice, appearance and storage.</string>
+    <string name="more_permissions">Manage microphone access and review the speech provider.</string>
+    <string name="more_about">Version, capabilities and boundaries.</string>
+    <string name="memory_kicker">LOCAL MEMORY</string>
+    <string name="memory_title">Personal memory</string>
+    <string name="memory_intro">VOICE OS remembers only the profile detail you choose to save.</string>
+    <string name="memory_name_title">How should we greet you?</string>
+    <string name="memory_name_intro">Your display name appears in the Home greeting. It’s optional and isn’t sent with commands.</string>
+    <string name="memory_name">Display name</string>
+    <string name="memory_limit">Up to %1$d characters.</string>
+    <string name="memory_invalid">Use up to %1$d characters with no control characters.</string>
+    <string name="memory_error">The secure store couldn’t complete the request. Try again or remove the local name.</string>
+    <string name="memory_saved">Saved on this phone and encrypted with Android Keystore.</string>
+    <string name="memory_scope">This version doesn’t learn from your conversations or access your contacts.</string>
+    <string name="save_name">Save name</string>
+    <string name="remove_name">Remove name</string>
+    <string name="memory_confirm">Remove your saved display name from this phone? Settings and history won’t change.</string>
+
+    <!-- History & pins -->
+    <string name="history_kicker">ACTIVITY LOG</string>
+    <string name="history_title">Command history</string>
+    <string name="history_intro">Up to %1$d recent results, newest first.</string>
+    <string name="history_empty">No commands yet</string>
+    <string name="history_empty_detail">Results appear after you run a command or shortcut.</string>
+    <string name="history_mode_on">Matched actions can be saved on this phone. Raw commands and audio aren’t written to the log.</string>
+    <string name="history_mode_off">New results stay in this session only. Previously saved entries remain until you delete them.</string>
+    <string name="history_error">Local history couldn’t be read or updated. Check your device storage and try again.</string>
+    <string name="history_settings">Storage settings</string>
+    <string name="history_clear">Clear history</string>
+    <string name="history_confirm">Delete the current conversation and the saved action log on this phone? This can’t be undone.</string>
+    <string name="source_voice">Voice</string>
+    <string name="source_text">Typed</string>
+    <string name="source_shortcut">Shortcut</string>
+    <string name="pins_kicker">QUICK ACCESS</string>
+    <string name="pins_title">Manage shortcuts</string>
+    <string name="pins_intro">Choose the built-in actions that appear on Home.</string>
+    <string name="pins_count">%1$d of %2$d pinned</string>
+    <string name="pins_manual">Press a shortcut to run it. Nothing is scheduled or runs in the background.</string>
+    <string name="pins_limit">Unpin one action before adding another.</string>
+    <string name="pins_to_home">See shortcuts on Home</string>
+
+    <!-- Settings & privacy -->
+    <string name="settings_kicker">SYSTEM PREFERENCES</string>
+    <string name="settings_title">Settings</string>
+    <string name="settings_intro">Change your language, sound, look and privacy settings.</string>
+    <string name="settings_language">Language</string>
+    <string name="settings_language_detail">Changes the interface and requests this locale for recognition and speech.</string>
+    <string name="language_ar">العربية (مصر)</string>
+    <string name="language_en">English (US)</string>
+    <string name="settings_voice">Voice &amp; recognition</string>
+    <string name="provider_title">Recognition provider</string>
+    <string name="provider_device_detail">Uses Android’s on-device recognizer when supported. No automatic network fallback.</string>
+    <string name="provider_system_detail">Uses the Android speech service selected by your device. It may process audio online.</string>
+    <string name="provider_system_toggle">Use the Android speech provider</string>
+    <string name="provider_system_toggle_detail">Off uses on-device mode only. On may send audio to the device provider.</string>
+    <string name="provider_consent_title">Allow the Android speech provider?</string>
+    <string name="provider_consent">The provider installed on your phone may send microphone audio to its own service. VOICE OS does not run that service. You can keep on-device mode and type instead.</string>
+    <string name="provider_use_system">Use provider</string>
+    <string name="settings_speak">Speak replies</string>
+    <string name="settings_speak_detail">Automatically read results using an installed offline voice, when available.</string>
+    <string name="settings_appearance">Appearance</string>
+    <string name="theme_dark">Deep dark</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_system">Follow Android</string>
+    <string name="settings_reduce_motion">Reduce motion</string>
+    <string name="settings_reduce_motion_detail">Pause the decorative orbit animation. Microphone levels can still be shown.</string>
+    <string name="settings_privacy">Privacy &amp; storage</string>
+    <string name="settings_history">Save action results on this phone</string>
+    <string name="settings_history_detail">Saves matched action, time and result only. Turning this off stops new saves; clear old entries from History.</string>
+    <string name="settings_privacy_detail">Local commands need no account or server. The website connection and Android speech provider are optional.</string>
+
+    <!-- Permissions & about -->
+    <string name="permissions_kicker">ACCESS CONTROL</string>
+    <string name="permissions_title">Permissions</string>
+    <string name="permissions_intro">You decide whether to use the microphone. Typed commands and shortcuts don’t need it.</string>
+    <string name="permissions_mic">Microphone</string>
+    <string name="permissions_mic_detail">Requested for press-to-talk only. Recording stops when you leave this app.</string>
+    <string name="permission_granted">Allowed</string>
+    <string name="permission_not_granted">Not allowed</string>
+    <string name="permission_request">Ask Android for access</string>
+    <string name="permission_retry_hint">If Android doesn’t show a new prompt, manage access in Android app settings.</string>
+    <string name="permission_android_settings">Open Android app settings</string>
+    <string name="permission_settings_failed">Android couldn’t open app settings. Open Apps from the Android Settings app.</string>
+    <string name="permissions_limits">VOICE OS doesn’t request contacts, camera, location, call or message access. It only opens the relevant Android screens.</string>
+    <string name="about_kicker">VOICE OS / ANDROID</string>
+    <string name="about_intro">A voice interface for real Android actions.</string>
+    <string name="about_version">VERSION %1$s · MVP</string>
+    <string name="about_product">VOICE OS is a regular Android app. It uses official APIs to hand off actions to the system, rather than pretending to be the operating system.</string>
+    <string name="about_scope">What this release does</string>
+    <string name="about_dispatch">Uses a local bilingual grammar for one command at a time. A launch reply means Android accepted the request, not that another app performed a task.</string>
+    <string name="about_privacy">Local actions work without a server. Connecting to a website for APK releases does not sync any history or voice data.</string>
+    <string name="about_limitations">No sending messages, making calls, scheduling, media autoplay, wake word or changing protected settings.</string>
+
+    <!-- Site connection and Android releases -->
+    <string name="nav_site">Website &amp; updates</string>
+    <string name="site_kicker">WEB CONNECTION</string>
+    <string name="site_intro">Connect this Android app to your VOICE OS website and check for a signed update.</string>
+    <string name="site_address">Official website</string>
+    <string name="site_address_detail">Save the HTTPS address of your own VOICE OS website. No commands, audio or history are uploaded.</string>
+    <string name="site_url">HTTPS website address</string>
+    <string name="site_invalid">Enter an HTTPS address without a path, query, or account details.</string>
+    <string name="site_save">Save website</string>
+    <string name="site_disconnect">Disconnect</string>
+    <string name="site_saved">Saved website: %1$s</string>
+    <string name="site_open">Open website</string>
+    <string name="site_updates_title">Android updates</string>
+    <string name="site_installed">Installed version: %1$s</string>
+    <string name="site_idle">Use Check for updates to contact the website.</string>
+    <string name="site_checking">Checking the website for an APK…</string>
+    <string name="site_connect_first">Save your website above to check for updates.</string>
+    <string name="site_no_release">The website responded, but no signed Android APK is published there yet.</string>
+    <string name="site_current">The website does not list a newer Android version.</string>
+    <string name="site_available">A newer release with the same signing certificate is listed.</string>
+    <string name="site_incompatible">This update requires a newer Android version.</string>
+    <string name="site_signer_mismatch">The published certificate differs from this install. It cannot replace this copy (including a debug copy).</string>
+    <string name="site_release_name">Published release: %1$s</string>
+    <string name="site_error">Could not verify release information. Check the site address and connection, then try again.</string>
+    <string name="site_check">Check for updates</string>
+    <string name="site_download">Download in browser</string>
+    <string name="site_browser_error">Android could not open a browser for the link.</string>
+    <string name="site_install_note">Downloads open in your browser. After downloading, open the file and confirm in Android. Installation is never automatic.</string>
+</resources>
