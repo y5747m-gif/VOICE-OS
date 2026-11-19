@@ -3,14 +3,16 @@ import { createReadStream } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import { resolve, sep, extname } from 'node:path';
 import { createVoiceApi } from './voice.mjs';
+import { createGroqApi } from './groq.mjs';
 import { createAndroidReleaseApi } from './android-release.mjs';
 
 const types = { '.webmanifest': 'application/manifest+json; charset=utf-8', '.png': 'image/png', '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.jpg': 'image/jpeg', '.woff2': 'font/woff2', '.woff': 'font/woff' };
 
-export function createWebServer({ directory, voice, android }) {
+export function createWebServer({ directory, voice, groq, android }) {
   const root = resolve(directory);
   const index = resolve(root, 'index.html');
   const voiceApi = createVoiceApi(voice);
+  const groqApi = createGroqApi(groq);
   const androidApi = createAndroidReleaseApi(android);
 
   async function serveFile(req, res) {
@@ -34,6 +36,6 @@ export function createWebServer({ directory, voice, android }) {
   }
 
   return createServer({ requestTimeout: 20_000 }, (req, res) => {
-    void voiceApi(req, res, () => { void androidApi(req, res, () => { void serveFile(req, res); }); });
+    void groqApi(req, res, () => { void voiceApi(req, res, () => { void androidApi(req, res, () => { void serveFile(req, res); }); }); });
   });
 }

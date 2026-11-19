@@ -214,6 +214,8 @@ footer i { display: inline-block; width: 4px; height: 4px; border-radius: 50%; b
 .reply p { font-size: 14px; overflow-wrap: anywhere; }
 .audio-state { color: #724692; padding: 8px 10px; border-radius: 10px; font-size: 12.5px; display: flex; gap: 6px; align-items: center; background: #f6ecfa; margin-top: 8px; }
 .audio-error { color: #843e62; background: #faedf3; }
+.ai-understand { display: flex; justify-content: flex-end; margin-top: 9px; }
+.ai-understand .subtle-button { min-height: 35px; background: #f8effb; }
 .action-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
 .action-card { display: flex; flex-direction: column; align-items: start; gap: 6px; text-align: start; border-radius: 22px; padding: 17px; min-height: 156px; transition: background .2s ease, transform .2s ease, box-shadow .2s ease; }
 .action-card:hover { background: #fff9fe; transform: translateY(-3px); box-shadow: 0 15px 35px -16px #77409152; }
