@@ -28,3 +28,11 @@ test('voice responses acknowledge a browser request, not completion inside the d
   assert.equal(voiceLine({ locale: 'fr', code: 'sample' }), null);
   assert.equal(voiceLine({ locale: 'ar', code: 'prepared' }), null);
 });
+
+test('handoff, download and same-tab replies describe the automatic launch', () => {
+  assert.equal(voiceLine({ locale: 'ar', code: 'handoff', actionId: 'youtube' }), 'طلبت من تطبيق VOICE OS يفتح يوتيوب على طول.');
+  assert.equal(voiceLine({ locale: 'en', code: 'opened-tab', actionId: 'maps' }), 'I asked the browser to open Google Maps in this tab.');
+  assert.equal(voiceLine({ locale: 'en', code: 'handoff', actionId: 'not-in-the-catalogue' }), null);
+  assert.match(voiceLine({ locale: 'ar', code: 'download' }), /مكان تحميله/);
+  assert.match(voiceLine({ locale: 'en', code: 'download' }), /download page/);
+});

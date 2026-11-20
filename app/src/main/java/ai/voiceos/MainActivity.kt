@@ -1,5 +1,6 @@
 package ai.voiceos
 
+import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -9,6 +10,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import ai.voiceos.ai.Phase
 import ai.voiceos.ai.SessionViewModel
+import ai.voiceos.core.DeviceAction
 import ai.voiceos.permissions.MicrophonePermission
 import ai.voiceos.site.SiteViewModel
 import ai.voiceos.ui.VoiceOsRoot
@@ -19,6 +21,7 @@ class MainActivity : ComponentActivity() {
     private var resumed = false
     private var permissionForVoice: Boolean? = null
     private var listenOnResume = false
+    private var pendingDeepLink: DeviceAction? = null
     private val microphoneLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         val start = permissionForVoice == true
         permissionForVoice = null
@@ -34,6 +37,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         if (Build.VERSION.SDK_INT >= 33) setRecentsScreenshotEnabled(false)
+        consumeDeepLink(intent)
         setContent {
             VoiceOsRoot(
                 activity = this,
@@ -46,10 +50,25 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        consumeDeepLink(intent)
+    }
+
+    /** The web edition sends voiceos://open?action=<catalogue key>; only catalogue keys run. */
+    private fun consumeDeepLink(intent: Intent?) {
+        val data = intent?.data ?: return
+        if (!data.scheme?.equals("voiceos", ignoreCase = true) || data.host?.equals("open", ignoreCase = true) != true) return
+        pendingDeepLink = DeviceAction.fromKey(data.getQueryParameter("action") ?: "")
+    }
+
     override fun onResume() {
         super.onResume()
         resumed = true
         model.enterForeground(this)
+        val action = pendingDeepLink
+        if (action != null && model.runDeepLink(action)) pendingDeepLink = null
         if (listenOnResume) {
             listenOnResume = false
             model.startVoice()

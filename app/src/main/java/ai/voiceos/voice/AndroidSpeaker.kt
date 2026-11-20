@@ -65,24 +65,30 @@ internal class AndroidSpeaker(context: Context, initial: VoiceLanguage) {
             return
         }
         if (!initialized) return
-        val voice = findVoice(language.locale)
-        if (voice == null) {
-            mutable.value = SpeakerState(SpeakerAvailability.MISSING_VOICE)
-            return
-        }
         val id = "voice-os-${++counter}"
-        activeId = id
-        val success = try {
-            engine.setVoice(voice) == TextToSpeech.SUCCESS &&
-                engine.speak(text, TextToSpeech.QUEUE_FLUSH, null, id) == TextToSpeech.SUCCESS
-        } catch (_: RuntimeException) {
-            false
+        val voice = findVoice(language.locale)
+        if (voice != null) {
+            val voiceSet = try { engine.setVoice(voice) == TextToSpeech.SUCCESS } catch (_: RuntimeException) { false }
+            if (voiceSet) {
+                activeId = id
+                reportSpeak(try { engine.speak(text, TextToSpeech.QUEUE_FLUSH, null, id) == TextToSpeech.SUCCESS }
+                    catch (_: RuntimeException) { false }, id)
+                return
+            }
         }
+        // No installed voice for the language: the engine's default voice is the last local
+        // resort, so the reply can still be spoken instead of refusing audio outright.
+        activeId = id
+        reportSpeak(try { engine.speak(text, TextToSpeech.QUEUE_FLUSH, null, id) == TextToSpeech.SUCCESS }
+            catch (_: RuntimeException) { false }, id)
+    }
+
+    private fun reportSpeak(success: Boolean, id: String) {
         if (success) {
             mutable.value = mutable.value.copy(playing = true)
             main.postDelayed(timeout, 15_000L)
         } else {
-            activeId = null
+            if (activeId == id) activeId = null
             mutable.value = SpeakerState(SpeakerAvailability.ENGINE_ERROR)
         }
     }

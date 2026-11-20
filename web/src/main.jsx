@@ -14,7 +14,8 @@ import '@fontsource/ibm-plex-sans-arabic/600.css';
 import { ACTIONS, COMMAND_LIMIT, VOICE, actionById, interpretCommand, localeTag, voiceLine } from './domain.mjs';
 import { copy } from './copy.mjs';
 import { useGroqSpeechInput, useSpeechInput, useVoicePlayer } from './voice.js';
-import { MobilePanel, mobileCopy, useInstallation } from './mobile.jsx';
+import { MobilePanel, mobileCopy, useInstallation, usePublishedApk } from './mobile.jsx';
+import { deepLinkFor, detectNativeApp, isAndroidDevice, openWebsite, planAutoLaunch } from './app-bridge.mjs';
 import wave from './assets/silk-wave.jpg';
 import './style.css';
 
@@ -115,7 +116,8 @@ function VoiceConsole({ t, state, mic, micPress, stop, draft, onDraft, send, inp
   const captured = state !== 'ready' && !listening && !thinking;
   const stageCopy = {
     ready: t.stageTitle, listening: t.stageListening, transcribing: t.stageWait, prepared: t.stagePrepared,
-    opened: t.stageOpened, stopped: t.stageStopped, error: t.stageError,
+    opened: t.stageOpened, 'opened-tab': t.stageOpened, handoff: t.stageOpened, download: t.stageOpened,
+    stopped: t.stageStopped, error: t.stageError,
   };
   const overLimit = draft.length > COMMAND_LIMIT;
   return (
@@ -169,8 +171,9 @@ function ResultCard({ result, t, language, launch, stop, mode, player, speak, ca
     : result.code === 'aiError' ? (t.groqError[result.issue] ?? t.groqError.provider_error)
       : result.code === 'aiThinking' ? t.groqThinking
         : result.code === 'stopped' ? t.stopMessage
-          : voiceLine({ locale: language, code: result.code, ...(result.code === 'opened' ? { actionId: result.actionId } : {}) });
-  const canPlay = mode !== 'muted' && ['opened', 'popup', 'unsupported', 'compound', 'tooLong', 'empty'].includes(result.code);
+          : voiceLine({ locale: language, code: result.code, ...(['opened', 'opened-tab', 'handoff'].includes(result.code) ? { actionId: result.actionId } : {}) });
+  const succeeded = ['opened', 'opened-tab', 'handoff'].includes(result.code);
+  const canPlay = mode !== 'muted' && ['opened', 'opened-tab', 'handoff', 'popup', 'unsupported', 'compound', 'tooLong', 'empty'].includes(result.code);
   return (
     <div className="result-wrap" ref={cardRef} tabIndex={-1} role="region" aria-label={t.result}>
       <div className="result-card">
@@ -184,7 +187,7 @@ function ResultCard({ result, t, language, launch, stop, mode, player, speak, ca
           </div>
         ) : (
           <div className="reply" aria-live="polite">
-            <span className={`reply-icon ${result.code !== 'opened' ? 'reply-warning' : ''}`} aria-hidden="true">{result.code === 'opened' ? <Check size={18} /> : <CircleAlert size={18} />}</span>
+            <span className={`reply-icon ${succeeded ? '' : 'reply-warning'}`} aria-hidden="true">{succeeded ? <Check size={18} /> : <CircleAlert size={18} />}</span>
             <div><span className="reply-label">{t.result}</span><p>{line}</p></div>
             {canPlay && <button className="icon-button" type="button" aria-label={player.busy ? t.stopAudio : t.replay} title={player.busy ? t.stopAudio : t.replay}
               onClick={() => player.busy ? player.stop() : speak(result)}>{player.busy ? <Square size={17} aria-hidden="true" /> : <Volume2 size={20} aria-hidden="true" />}</button>}
@@ -332,12 +335,28 @@ function VoiceSettings({ t, configuration, mode, choose, auto, onAuto, player, s
   </Modal>;
 }
 
+function useNativeApp() {
+  const [state, setState] = useState('checking');
+  useEffect(() => {
+    if (!isAndroidDevice()) {
+      setState('unknown');
+      return undefined;
+    }
+    let live = true;
+    detectNativeApp().then((next) => { if (live) setState(next); });
+    return () => { live = false; };
+  }, []);
+  return state;
+}
+
 function App() {
   const [language, setLanguage] = useState(() => readPref('language', ['ar', 'en'], 'ar'));
   const t = copy[language];
   const installLabel = mobileCopy[language];
   const device = useInstallation();
+  const apk = usePublishedApk();
   const [page, setPage] = useState(getPage);
+  const appState = useNativeApp();
   const [mode, setMode] = useState(() => readPref('mode', ['browser', 'eleven', 'muted'], 'browser'));
   const [auto, setAuto] = useState(() => readPref('auto', ['on', 'off'], 'off') === 'on');
   const [configuration, setConfiguration] = useState('checking');
@@ -437,7 +456,8 @@ function App() {
     setResult({ code: 'stopped', id: ++sequence.current });
   }
   function speak(reply) {
-    const payload = { locale: language, code: reply.code, ...(reply.code === 'opened' ? { actionId: reply.actionId } : {}) };
+    const needsAction = ['opened', 'opened-tab', 'handoff'].includes(reply.code);
+    const payload = { locale: language, code: reply.code, ...(needsAction && reply.actionId ? { actionId: reply.actionId } : {}) };
     return player.play(payload, mode);
   }
   function process(text) {
@@ -445,6 +465,10 @@ function App() {
     player.stop();
     const reply = { ...interpretCommand(text), transcript: text.slice(0, COMMAND_LIMIT), id: ++sequence.current };
     setResult(reply);
+    if (reply.code === 'prepared') {
+      void autoLaunch(actionById(reply.actionId), reply.transcript);
+      return;
+    }
     if (auto && reply.code !== 'prepared') void speak(reply);
   }
   function send(event) {
@@ -453,6 +477,12 @@ function App() {
     process(draft);
     setDraft('');
     inputRef.current?.blur();
+  }
+  function recordLaunch(reply, transcript) {
+    setEntries((previous) => [reply, ...previous].slice(0, 40));
+    setResult({ ...reply, transcript });
+    if (page !== 'home') navigate('home');
+    if (auto) void speak(reply);
   }
   function launch(action, transcript) {
     // The popup is opened synchronously from a user's click. Recognizer callbacks only prepare a plan.
@@ -469,11 +499,38 @@ function App() {
         code = 'opened';
       }
     } catch { try { tab?.close(); } catch { /* popup may already be closed */ } }
-    const reply = { id: ++sequence.current, code, actionId: action.id, at: Date.now() };
-    setEntries((previous) => [reply, ...previous].slice(0, 40));
-    setResult({ ...reply, transcript });
-    if (page !== 'home') navigate('home');
-    if (auto) void speak(reply);
+    recordLaunch({ id: ++sequence.current, code, actionId: action.id, at: Date.now() }, transcript);
+  }
+  async function autoLaunch(action, transcript) {
+    if (!action) return;
+    cancelVoiceInput();
+    cancelAiRequest();
+    player.stop();
+    // On Android, hand the command to the installed app; otherwise take the user straight to
+    // the download location. Every other device opens the website in the current tab.
+    const android = isAndroidDevice();
+    const installed = android ? await detectNativeApp() : false;
+    const route = planAutoLaunch({ android, appInstalled: installed });
+    const base = { id: ++sequence.current, actionId: action.id, at: Date.now() };
+    if (route === 'handoff') {
+      // The native app takes over the browser; the page is replaced on purpose.
+      recordLaunch({ ...base, code: 'handoff' }, transcript);
+      setTimeout(() => { try { window.location.assign(deepLinkFor(action.id)); } catch { /* navigation may fail in rare contexts */ } }, 500);
+      return;
+    }
+    if (route === 'download') {
+      recordLaunch({ ...base, code: 'download' }, transcript);
+      setTimeout(goToDownload, 600);
+      return;
+    }
+    const code = openWebsite(action.url) === 'opened' ? 'opened' : 'opened-tab';
+    recordLaunch({ ...base, code }, transcript);
+  }
+  function goToDownload() {
+    if (apk.status === 'ready') {
+      try { window.location.assign(apk.release.downloadPath); return; } catch { /* fall through to the in-page location */ }
+    }
+    setDialog('install');
   }
   function startMic() {
     setResult(null);
@@ -527,9 +584,12 @@ function App() {
         return;
       }
       const action = actionById(data.actionId);
-      setResult(action
-        ? { code: 'prepared', actionId: action.id, transcript: command, id: requestId }
-        : { code: 'unsupported', transcript: command, id: requestId });
+      if (action) {
+        setResult({ code: 'prepared', actionId: action.id, transcript: command, id: requestId });
+        void autoLaunch(action, command);
+      } else {
+        setResult({ code: 'unsupported', transcript: command, id: requestId });
+      }
     } catch (error) {
       if (error?.name !== 'AbortError' && aiRequest.current === controller) {
         setResult({ code: 'aiError', issue: 'provider_error', transcript: command, id: requestId });
@@ -574,7 +634,7 @@ function App() {
   });
 
   const state = mic.phase !== 'idle' ? mic.phase : result?.code === 'aiThinking' ? 'transcribing' : !result ? 'ready'
-    : ['prepared', 'opened', 'stopped'].includes(result.code) ? result.code : 'error';
+    : ['prepared', 'opened', 'opened-tab', 'handoff', 'download', 'stopped'].includes(result.code) ? result.code : 'error';
 
   return (
     <>
@@ -599,7 +659,9 @@ function App() {
         <footer><span><ShieldCheck size={15} strokeWidth={1.8} aria-hidden="true" />{t.privacy}</span><span lang="en" dir="ltr">VOICE OS <i /> WEB EDITION</span></footer>
       </div>
       {dialog === 'install' && <Modal title={installLabel.title} icon={Smartphone} onClose={() => setDialog(null)} t={t}>
-        <MobilePanel language={language} device={device} beforeRefresh={() => { cancelVoiceInput(); cancelAiRequest(); player.stop(); }} />
+        <MobilePanel language={language} device={device} beforeRefresh={() => { cancelVoiceInput(); cancelAiRequest(); player.stop(); }}
+          appState={appState} onOpenApp={() => { setDialog(null); setTimeout(() => { try { window.location.assign(deepLinkFor('')); } catch { /* navigation may fail */ } }, 200); }}
+          onGoDownload={goToDownload} apk={apk} />
       </Modal>}
       {dialog === 'settings' && <VoiceSettings t={t} configuration={configuration} mode={mode} choose={chooseMode} auto={auto}
         onAuto={(value) => { setAuto(value); writePref('auto', value ? 'on' : 'off'); }}

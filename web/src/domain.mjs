@@ -57,6 +57,17 @@ export function voiceLine({ locale, code, actionId }) {
       if (!action) return null;
       return ar ? `طلبت من المتصفح يفتح ${action.name.ar} في تبويب جديد.` : `I asked the browser to open ${action.name.en} in a new tab.`;
     }
+    case 'opened-tab': {
+      const action = actionById(actionId);
+      if (!action) return null;
+      return ar ? `طلبت من المتصفح يفتح ${action.name.ar} في التبويب الحالي.` : `I asked the browser to open ${action.name.en} in this tab.`;
+    }
+    case 'handoff': {
+      const action = actionById(actionId);
+      if (!action) return null;
+      return ar ? `طلبت من تطبيق VOICE OS يفتح ${action.name.ar} على طول.` : `I asked the VOICE OS app to open ${action.name.en} directly.`;
+    }
+    case 'download': return ar ? 'التطبيق مش مثبّت على التليفون. بنحولك على مكان تحميله على طول.' : 'The app isn’t installed on this phone. Taking you to its download page directly.';
     case 'popup': return ar ? 'المتصفح منع التبويب الجديد. اسمح بالتبويبات المنبثقة وجرّب تاني.' : 'The browser blocked the new tab. Allow pop-ups for this site and try again.';
     case 'unsupported': return ar ? 'الأمر ده مش مدعوم في نسخة الويب. جرّب عبارة واحدة من صفحة الأوامر.' : 'This command isn’t supported on the web. Try one phrase from the Actions page.';
     case 'compound': return ar ? 'قول أمر واحد في المرة. ما اتفتحش أي موقع.' : 'Try one command at a time. No website was opened.';
