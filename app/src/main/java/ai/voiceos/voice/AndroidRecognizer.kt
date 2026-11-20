@@ -4,6 +4,8 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
@@ -31,7 +33,12 @@ internal sealed interface SpeechUpdate {
 /** Main-thread, press-to-talk recognizer. One disposable instance per request prevents late callbacks. */
 internal class AndroidRecognizer(private val context: Context) {
     private data class Attempt(val client: SpeechRecognizer, val result: CompletableDeferred<Recognition>)
+    private val main = Handler(Looper.getMainLooper())
     private var active: Attempt? = null
+    private val finishFallback = Runnable {
+        val attempt = active ?: return
+        if (!attempt.result.isCompleted) attempt.result.complete(Recognition.Failed(VoiceIssue.NO_SPEECH))
+    }
 
     fun availability(mode: RecognitionMode): VoiceIssue? = try {
         when (mode) {
@@ -110,8 +117,11 @@ internal class AndroidRecognizer(private val context: Context) {
         val attempt = active ?: return
         try {
             attempt.client.stopListening()
+            main.removeCallbacks(finishFallback)
+            main.postDelayed(finishFallback, 2_500L)
         } catch (_: RuntimeException) {
-            attempt.result.complete(Recognition.Failed(VoiceIssue.PROVIDER))
+            main.removeCallbacks(finishFallback)
+            if (!attempt.result.isCompleted) attempt.result.complete(Recognition.Failed(VoiceIssue.PROVIDER))
         }
     }
 
@@ -121,7 +131,8 @@ internal class AndroidRecognizer(private val context: Context) {
 
     private fun release(attempt: Attempt) {
         active = null // ignore any callbacks queued by cancel() / destroy()
-        attempt.result.cancel()
+        main.removeCallbacks(finishFallback)
+        if (!attempt.result.isCompleted) attempt.result.cancel()
         try { attempt.client.cancel() } catch (_: RuntimeException) { /* best effort on a dying binder */ }
         try { attempt.client.destroy() } catch (_: RuntimeException) { /* already detached */ }
     }

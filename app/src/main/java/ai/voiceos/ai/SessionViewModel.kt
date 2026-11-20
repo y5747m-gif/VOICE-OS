@@ -159,6 +159,13 @@ internal class SessionViewModel(private val app: VoiceOsApplication) : ViewModel
         begin(InputSource.SHORTCUT, Phase.THINKING) { id -> process(id) { plan -> engine.run(action, plan) } }
     }
 
+    /** Deep link from the web edition: run the catalogue action directly in the app. */
+    fun runDeepLink(action: DeviceAction): Boolean {
+        if (!canStart()) return false
+        runShortcut(action)
+        return true
+    }
+
     fun stop() {
         if (session.value.busy) cancelWork()
         speaker.stop()

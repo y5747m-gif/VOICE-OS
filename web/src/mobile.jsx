@@ -19,6 +19,11 @@ export const mobileCopy = {
     loadingApk: 'بنفحص الإصدار المنشور…', noApk: 'لسه مفيش APK موقّع منشور على الموقع. تقدر تثبّت تطبيق الموقع من فوق.',
     apkError: 'مقدرناش نقرأ الإصدار المنشور. اتأكد من اتصال الموقع وجرّب تاني.', retry: 'جرّب تاني',
     download: 'نزّل APK', minAndroid: (level) => `Android API ${level} أو أحدث`,
+    appChecking: 'بنبحث عن تطبيق VOICE OS على التليفون…',
+    appDetected: 'الموقع اكتشف إن التطبيق مثبّت.', appDetectedDetail: 'الأوامر هتنفذ على طول في التطبيق نفسه من غير ما تروح من هنا.',
+    appMissing: 'الموقع مالقاش تطبيق VOICE OS على التليفون.', appMissingDetail: 'الأوامر هتروح على طول لمكان تحميل التطبيق.',
+    appUnknown: 'مفيش كشف لتطبيق Android من هنا. الأوامر هتفتح في المتصفح.',
+    openApp: 'افتح التطبيق', goDownload: 'روح لمكان التحميل',
   },
   en: {
     button: 'Install app', title: 'Install & updates', updateBadge: 'Update ready',
@@ -36,6 +41,11 @@ export const mobileCopy = {
     loadingApk: 'Checking the published release…', noApk: 'No signed APK is published here yet. You can install the web app above.',
     apkError: 'Couldn’t read the published release. Check your connection and retry.', retry: 'Retry',
     download: 'Download APK', minAndroid: (level) => `Android API ${level} or newer`,
+    appChecking: 'Looking for the VOICE OS app on this phone…',
+    appDetected: 'The site found the app installed.', appDetectedDetail: 'Commands run directly in the app itself without leaving here.',
+    appMissing: 'The site couldn’t find the VOICE OS app on this phone.', appMissingDetail: 'Commands go straight to the app’s download location.',
+    appUnknown: 'No Android app detection from here. Commands open in the browser.',
+    openApp: 'Open the app', goDownload: 'Go to the download page',
   },
 };
 
@@ -143,7 +153,7 @@ export function useInstallation() {
   return { installed, canPrompt: Boolean(prompt), supported, waiting: waiting || status === 'waiting', status, install, check, apply };
 }
 
-function usePublishedApk() {
+export function usePublishedApk() {
   const [attempt, setAttempt] = useState(0);
   const [state, setState] = useState({ status: 'checking' });
   useEffect(() => {
@@ -170,11 +180,13 @@ function usePublishedApk() {
   return { ...state, retry: () => setAttempt((number) => number + 1) };
 }
 
-export function MobilePanel({ language, device, beforeRefresh }) {
+export function MobilePanel({ language, device, beforeRefresh, appState, onOpenApp, onGoDownload, apk }) {
   const t = mobileCopy[language];
-  const apk = usePublishedApk();
   const busy = ['checking', 'downloading', 'applying'].includes(device.status);
   const format = new Intl.NumberFormat(language === 'ar' ? 'ar-EG' : 'en-US', { maximumFractionDigits: 1 });
+  const detectionCopy = appState === 'installed' ? { title: t.appDetected, detail: t.appDetectedDetail }
+    : appState === 'missing' ? { title: t.appMissing, detail: t.appMissingDetail }
+      : appState === 'unknown' ? { title: t.appUnknown, detail: t.appUnknown } : null;
   return <div className="mobile-panel">
     <section className="mobile-section">
       <div className="mobile-section-heading"><Smartphone size={19} aria-hidden="true" /><h3>{t.web}</h3></div>
@@ -185,6 +197,16 @@ export function MobilePanel({ language, device, beforeRefresh }) {
         {!device.installed && <a href={window.location.href} target="_blank" rel="noreferrer" className="text-button">{t.openTab}<ArrowUpRight size={16} aria-hidden="true" /></a>}
       </div>
     </section>
+    {detectionCopy && (
+      <section className="mobile-section">
+        <div className="mobile-section-heading"><RefreshCw size={18} aria-hidden="true" /><h3>{detectionCopy.title}</h3></div>
+        <p>{detectionCopy.detail}</p>
+        <div className="mobile-buttons">
+          {appState === 'installed' && <button type="button" className="primary-button" onClick={onOpenApp}>{t.openApp}</button>}
+          {appState === 'missing' && <button type="button" className="primary-button" onClick={onGoDownload}>{t.goDownload}</button>}
+        </div>
+      </section>
+    )}
     <section className="mobile-section">
       <div className="mobile-section-heading"><RefreshCw size={18} aria-hidden="true" /><h3>{t.updateTitle}</h3></div>
       <p role="status">{t[device.status]}</p>

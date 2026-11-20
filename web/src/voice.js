@@ -88,6 +88,7 @@ export function useVoicePlayer() {
   const request = useRef(null);
   const media = useRef(null); // keep at most one ready clip, including a clip awaiting user gesture
   const local = useRef(false);
+  const voices = useRef([]);
 
   const stop = useCallback((silent = false) => {
     generation.current++;
@@ -103,6 +104,58 @@ export function useVoicePlayer() {
     if (!silent) setState({ phase: 'idle' });
   }, []);
 
+  const refreshVoices = useCallback(() => {
+    const synth = window.speechSynthesis;
+    if (!synth) return;
+    const list = synth.getVoices?.() ?? [];
+    if (list.length) voices.current = list;
+  }, []);
+
+  // Engines load their local voice list asynchronously after the first query; keep it fresh.
+  useEffect(() => {
+    const synth = window.speechSynthesis;
+    if (!synth) return undefined;
+    refreshVoices();
+    synth.addEventListener?.('voiceschanged', refreshVoices);
+    return () => {
+      synth.removeEventListener?.('voiceschanged', refreshVoices);
+    };
+  }, [refreshVoices]);
+
+  // Resolves the best local voice for a locale: exact match, same language, then any local
+  // voice. Falls back to the engine default only as a last resort so audio still plays.
+  function resolveVoice(locale) {
+    const lang = localeTag(locale).toLowerCase();
+    const base = lang.split(/[-_]/)[0];
+    const all = voices.current;
+    const localVoices = all.filter((voice) => voice.localService !== false);
+    const exact = localVoices.find((voice) => voice.lang.toLowerCase().replace('_', '-') === lang);
+    if (exact) return exact;
+    const sameLanguage = localVoices.find((voice) => voice.lang.toLowerCase().split(/[-_]/)[0] === base);
+    if (sameLanguage) return sameLanguage;
+    if (localVoices[0]) return localVoices[0];
+    return all[0] ?? null;
+  }
+
+  async function ensureVoices() {
+    if (voices.current.length) return;
+    const synth = window.speechSynthesis;
+    if (!synth) return;
+    await new Promise((resolve) => {
+      let done = false;
+      const finish = () => {
+        if (done) return;
+        done = true;
+        synth.removeEventListener?.('voiceschanged', finish);
+        resolve();
+      };
+      synth.addEventListener?.('voiceschanged', finish);
+      setTimeout(finish, 600);
+      refreshVoices();
+    });
+    if (!voices.current.length) refreshVoices();
+  }
+
   const play = useCallback(async (payload, mode) => {
     const line = voiceLine(payload);
     if (!line || mode === 'muted') return;
@@ -112,9 +165,9 @@ export function useVoicePlayer() {
     if (mode === 'browser') {
       try {
         const synth = window.speechSynthesis;
-        const lang = localeTag(payload.locale).toLowerCase();
-        const voices = synth?.getVoices?.().filter((voice) => voice.localService && voice.lang.toLowerCase().split(/[-_]/)[0] === payload.locale) ?? [];
-        const voice = voices.find((entry) => entry.lang.toLowerCase().replace('_', '-') === lang) ?? voices[0];
+        if (!synth) { settle({ phase: 'error', issue: 'playback' }); return; }
+        await ensureVoices();
+        const voice = resolveVoice(payload.locale);
         if (!voice) { settle({ phase: 'error', issue: 'no_local' }); return; }
         const utterance = new SpeechSynthesisUtterance(line);
         utterance.voice = voice;
@@ -124,7 +177,9 @@ export function useVoicePlayer() {
         utterance.onerror = () => settle({ phase: 'error', issue: 'playback' });
         synth.speak(utterance);
         settle({ phase: 'playing' });
-      } catch { settle({ phase: 'error', issue: 'playback' }); }
+      } catch (error) {
+        settle({ phase: 'error', issue: error?.name === 'NotAllowedError' ? 'gesture' : 'playback' });
+      }
       return;
     }
     const id = JSON.stringify(payload);
@@ -164,8 +219,6 @@ export function useVoicePlayer() {
   }, [stop]);
 
   useEffect(() => {
-    // Some engines load their local voice list asynchronously after the first query.
-    window.speechSynthesis?.getVoices();
     return () => {
       stop(true);
       if (media.current) URL.revokeObjectURL(media.current.url);
